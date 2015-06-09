@@ -830,6 +830,99 @@ MooseVariable::computeElemValues()
       u_dot_local        = u_dot(idx);
     }
 
+////////////////////////////////////////////////////////////////////////////////
+
+    for (unsigned int qp=0; qp < nqp; qp++)
+    {
+      phi_local = _phi[i][qp];
+      dphi_qp = &_grad_phi[i][qp];
+      grad_u_qp = &_grad_u[qp];
+
+      _u[qp] += phi_local * soln_local;
+      grad_u_qp->add_scaled(*dphi_qp, soln_local);
+    }
+
+    if (_need_second)
+    {
+      for (unsigned int qp=0; qp < nqp; qp++)
+      {
+        d2phi_local = &(*_second_phi)[i][qp];
+        second_u_qp = &_second_u[qp];
+        second_u_qp->add_scaled(*d2phi_local, soln_local);
+      }
+    }
+
+    if (is_transient)
+    {
+      for (unsigned int qp=0; qp < nqp; qp++)
+      {
+        phi_local = _phi[i][qp];
+        _u_dot[qp]        += phi_local * u_dot_local;
+        _du_dot_du[qp]    = du_dot_du;
+      }
+
+      if (_need_u_old)
+      {
+        for (unsigned int qp=0; qp < nqp; qp++)
+        {
+          phi_local = _phi[i][qp];
+          _u_old[qp]        += phi_local * soln_old_local;
+        }
+      }
+
+      if (_need_u_older)
+      {
+        for (unsigned int qp=0; qp < nqp; qp++)
+        {
+          phi_local = _phi[i][qp];
+          _u_older[qp]      += phi_local * soln_older_local;
+        }
+      }
+
+      if (_need_grad_old)
+      {
+        for (unsigned int qp=0; qp < nqp; qp++)
+        {
+          dphi_qp = &_grad_phi[i][qp];
+          grad_u_old_qp = &_grad_u_old[qp];
+          grad_u_old_qp->add_scaled(*dphi_qp, soln_old_local);
+        }
+      }
+
+      if (_need_grad_older)
+      {
+        for (unsigned int qp=0; qp < nqp; qp++)
+        {
+          dphi_qp = &_grad_phi[i][qp];
+          grad_u_older_qp = &_grad_u_older[qp];
+          grad_u_older_qp->add_scaled(*dphi_qp, soln_older_local);
+        }
+      }
+
+      if (_need_second_old)
+      {
+        for (unsigned int qp=0; qp < nqp; qp++)
+        {
+          d2phi_local = &(*_second_phi)[i][qp];
+          second_u_old_qp = &_second_u_old[qp];
+          second_u_old_qp->add_scaled(*d2phi_local, soln_old_local);
+        }
+      }
+
+      if (_need_second_older)
+      {
+        for (unsigned int qp=0; qp < nqp; qp++)
+        {
+          d2phi_local = &(*_second_phi)[i][qp];
+          second_u_older_qp = &_second_u_older[qp];
+          second_u_older_qp->add_scaled(*d2phi_local, soln_older_local);
+        }
+      }
+    }
+
+////////////////////////////////////////////////////////////////////////////////
+
+    /*
     for (unsigned int qp=0; qp < nqp; qp++)
     {
       phi_local = _phi[i][qp];
@@ -894,6 +987,7 @@ MooseVariable::computeElemValues()
           second_u_older_qp->add_scaled(*d2phi_local, soln_older_local);
       }
     }
+    */
   }
 }
 
