@@ -51,11 +51,33 @@ protected:
    */
   Node * getNearestNode(const Point & p, Real & distance, MooseMesh * mesh, bool local);
 
+  /**
+   * Return the distance between the given point and the farthest corner of the
+   * given bounding box.
+   * @param p The point to evaluate all distances from.
+   * @param bbox The bounding box to evaluate the distance to.
+   * @return The maximum distance between the point p and the eight corners of
+   * the bounding box bbox.
+   */
+  Real bboxMaxDistance(Point p, MeshTools::BoundingBox bbox);
+
+  /**
+   * Return the distance between the given point and the nearest corner of the
+   * given bounding box.
+   * @param p The point to evaluate all distances from.
+   * @param bbox The bounding box to evaluate the distance to.
+   * @return The minimum distance between the point p and the eight corners of
+   * the bounding box bbox.
+   */
+  Real bboxMinDistance(Point p, MeshTools::BoundingBox bbox);
+
   AuxVariableName _to_var_name;
   VariableName _from_var_name;
 
+/*
   bool _displaced_source_mesh;
   bool _displaced_target_mesh;
+*/
 
   /// If true then node connections will be cached
   bool _fixed_meshes;

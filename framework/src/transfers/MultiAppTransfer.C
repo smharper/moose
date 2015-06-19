@@ -17,6 +17,9 @@
 #include "Transfer.h"
 #include "MooseTypes.h"
 #include "FEProblem.h"
+#include "DisplacedProblem.h"
+
+#include "libmesh/parallel_algebra.h"
 
 template<>
 InputParameters validParams<MultiAppTransfer>()
@@ -29,6 +32,9 @@ InputParameters validParams<MultiAppTransfer>()
   // MultiAppTransfers by default will execute with their associated MultiApp. These flags will be added by FEProblem when the transfer is added.
   MultiMooseEnum multi_transfer_execute_on(params.get<MultiMooseEnum>("execute_on").getRawNames() + " same_as_multiapp", "same_as_multiapp");
   params.set<MultiMooseEnum>("execute_on") = multi_transfer_execute_on;
+
+  params.addParam<bool>("displaced_source_mesh", false, "Whether or not to use the displaced mesh for the source mesh.");
+  params.addParam<bool>("displaced_target_mesh", false, "Whether or not to use the displaced mesh for the target mesh.");
 
   return params;
 }
@@ -48,14 +54,139 @@ MultiAppTransfer::MultiAppTransfer(const std::string & name, InputParameters par
      */
     Transfer(name, removeSpecialOption(parameters)),
     _multi_app(_fe_problem.getMultiApp(getParam<MultiAppName>("multi_app"))),
-    _direction(getParam<MooseEnum>("direction"))
+    _direction(getParam<MooseEnum>("direction")),
+    _displaced_source_mesh(getParam<bool>("displaced_source_mesh")),
+    _displaced_target_mesh(getParam<bool>("displaced_target_mesh"))
 {
 }
 
 void
 MultiAppTransfer::variableIntegrityCheck(const AuxVariableName & var_name) const
 {
-  for (unsigned int i=0; i<_multi_app->numGlobalApps(); i++)
+  for (unsigned int i = 0; i < _multi_app->numGlobalApps(); i++)
     if (_multi_app->hasLocalApp(i) && !find_sys(_multi_app->appProblem(i)->es(), var_name))
       mooseError("Cannot find variable " << var_name << " for " << _name << " Transfer");
 }
+
+void
+MultiAppTransfer::getAppInfo()
+{
+  /**
+   * This method will fill information into the convenience member variables
+   * (_to_problems, _from_meshes, etc.)
+   */
+  // I would like to do all of this in initialSetup, but it will fail with
+  // multiapps that reset.  A reset deletes and rebuilds the FEProblems so all
+  // of the pointers will be broken.
+
+  // Clear the vectors since we've probably built them up from a previous call
+  _from_problems.clear();
+  _to_problems.clear();
+  _from_es.clear();
+  _to_es.clear();
+  _from_meshes.clear();
+  _to_meshes.clear();
+  _positions.clear();
+
+  // Build the vectors for to problems, from problems, and subapps positions.
+  switch (_direction)
+  {
+    case TO_MULTIAPP:
+      _from_problems.push_back(_multi_app->problem());
+      for (unsigned int i_app = 0; i_app < _multi_app->numGlobalApps(); i_app++)
+      {
+        if (!_multi_app->hasLocalApp(i_app)) continue;
+        _local2global_map.push_back(i_app);
+        _to_problems.push_back(_multi_app->appProblem(i_app));
+        _positions.push_back(_multi_app->position(i_app));
+      }
+      break;
+
+    case FROM_MULTIAPP:
+      _to_problems.push_back(_multi_app->problem());
+      for (unsigned int i_app = 0; i_app < _multi_app->numGlobalApps(); i_app++)
+      {
+        if (!_multi_app->hasLocalApp(i_app)) continue;
+        _local2global_map.push_back(i_app);
+        _from_problems.push_back(_multi_app->appProblem(i_app));
+        _positions.push_back(- _multi_app->position(i_app));
+      }
+      break;
+  }
+
+  // Build the from and to equation systems and mesh vectors.
+  for (unsigned int i = 0; i < _to_problems.size(); i++)
+  {
+    //TODO: Do I actually want es or displaced es?
+    _to_es.push_back(& _to_problems[i]->es());
+    if (_displaced_target_mesh && _to_problems[i]->getDisplacedProblem())
+      _to_meshes.push_back(& _to_problems[i]->getDisplacedProblem()->mesh().getMesh());
+    else
+      _to_meshes.push_back(& _to_es[i]->get_mesh());
+  }
+  for (unsigned int i = 0; i < _from_problems.size(); i++)
+  {
+    _from_es.push_back(& _from_problems[i]->es());
+    if (_displaced_source_mesh && _from_problems[i]->getDisplacedProblem())
+      _from_meshes.push_back(& _from_problems[i]->getDisplacedProblem()->mesh().getMesh());
+    else
+      _from_meshes.push_back(& _from_es[i]->get_mesh());
+  }
+}
+
+std::vector<MeshTools::BoundingBox>
+MultiAppTransfer::getBboxes()
+{
+  std::vector<std::pair<Point, Point> > bb_points(_from_meshes.size());
+  for (unsigned int i = 0; i <  _from_meshes.size(); i++)
+  {
+    // Get a bounding box around the mesh elements that are local to the current
+    // processor.
+    MeshTools::BoundingBox bbox = MeshTools::processor_bounding_box(* _from_meshes[i], processor_id());
+
+    // Translate the bounding box to the subapp's position.
+    bbox.first += _positions[i];
+    bbox.second += _positions[i];
+
+    // Cast the bounding box into a pair of points (so it can be put through
+    // MPI communication).
+    bb_points[i] = static_cast<std::pair<Point, Point> >(bbox);
+  }
+
+  // Serialize the bounding box points.
+  _communicator.allgather(bb_points);
+
+  // Recast the points back into bounding boxes and return.
+  std::vector<MeshTools::BoundingBox> bboxes(bb_points.size());
+  for (unsigned int i = 0; i <  bb_points.size(); i++)
+    bboxes[i] = static_cast<MeshTools::BoundingBox>(bb_points[i]);
+
+  return bboxes;
+}
+
+std::vector<processor_id_type>
+MultiAppTransfer::getFromProblem2ProcMap()
+{
+  processor_id_type pid = processor_id();
+  std::vector<processor_id_type> proc_ids(_from_problems.size(), pid);
+  _communicator.allgather(proc_ids);
+  return proc_ids;
+}
+
+NumericVector<Real> &
+MultiAppTransfer::getTransferVector(unsigned int i_local, std::string var_name)
+{
+  mooseAssert(_direction == TO_MULTIAPP, "getTransferVector only works for transfers to multiapps");
+
+  // Get and return the appropriate vector.
+  return _multi_app->appTransferVector(_local2global_map[i_local], var_name);
+}
+
+/*
+void
+MultiAppTransfer::broadcastPoints(std::vector<std::vector<Point> > & outgoing_points)
+{
+  if (outgoing_points.size() != n_processors())
+    mooseError("Error in " << _name << " Transfer: MultiAppTransfer::broadcastPoints needs one vector of points per processor")
+}
+*/

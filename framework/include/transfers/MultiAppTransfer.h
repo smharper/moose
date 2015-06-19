@@ -65,6 +65,31 @@ protected:
 
   /// Whether we're transferring to or from the MultiApp
   MooseEnum _direction;
+
+  void getAppInfo();
+  std::vector<processor_id_type> getFromProblem2ProcMap();
+  NumericVector<Real> & getTransferVector(unsigned int i_local, std::string var_name);
+
+  std::vector<FEProblem *> _to_problems;
+  std::vector<FEProblem *> _from_problems;
+  std::vector<EquationSystems *> _to_es;
+  std::vector<EquationSystems *> _from_es;
+  std::vector<MeshBase *> _to_meshes;
+  std::vector<MeshBase *> _from_meshes;
+  std::vector<Point> _positions;    // Offset for subapps
+
+  bool _displaced_source_mesh;
+  bool _displaced_target_mesh;
+
+  //bool _is_block_restricted = false;
+  //bool _is_side_restricted = false;
+
+  std::vector<MeshTools::BoundingBox> getBboxes();
+  //std::vector<unsigned int> get_blocks();
+  //std::vector<unsigned int> get_sides();
+
+private:
+  std::vector<unsigned int> _local2global_map;
 };
 
 #endif /* MULTIAPPTRANSFER_H */
