@@ -86,7 +86,8 @@ MultiAppTransfer::getAppInfo()
   _to_es.clear();
   _from_meshes.clear();
   _to_meshes.clear();
-  _positions.clear();
+  _to_positions.clear();
+  _from_positions.clear();
 
   // Build the vectors for to problems, from problems, and subapps positions.
   switch (_direction)
@@ -98,7 +99,8 @@ MultiAppTransfer::getAppInfo()
         if (!_multi_app->hasLocalApp(i_app)) continue;
         _local2global_map.push_back(i_app);
         _to_problems.push_back(_multi_app->appProblem(i_app));
-        _positions.push_back(_multi_app->position(i_app));
+        _to_positions.push_back(_multi_app->position(i_app));
+        _from_positions.push_back(Point(0., 0., 0.));
       }
       break;
 
@@ -109,7 +111,8 @@ MultiAppTransfer::getAppInfo()
         if (!_multi_app->hasLocalApp(i_app)) continue;
         _local2global_map.push_back(i_app);
         _from_problems.push_back(_multi_app->appProblem(i_app));
-        _positions.push_back(- _multi_app->position(i_app));
+        _to_positions.push_back(Point(0., 0., 0.));
+        _from_positions.push_back(- _multi_app->position(i_app));
       }
       break;
   }
@@ -120,17 +123,17 @@ MultiAppTransfer::getAppInfo()
     //TODO: Do I actually want es or displaced es?
     _to_es.push_back(& _to_problems[i]->es());
     if (_displaced_target_mesh && _to_problems[i]->getDisplacedProblem())
-      _to_meshes.push_back(& _to_problems[i]->getDisplacedProblem()->mesh().getMesh());
+      _to_meshes.push_back(& _to_problems[i]->getDisplacedProblem()->mesh());
     else
-      _to_meshes.push_back(& _to_es[i]->get_mesh());
+      _to_meshes.push_back(& _to_problems[i]->mesh());
   }
   for (unsigned int i = 0; i < _from_problems.size(); i++)
   {
     _from_es.push_back(& _from_problems[i]->es());
     if (_displaced_source_mesh && _from_problems[i]->getDisplacedProblem())
-      _from_meshes.push_back(& _from_problems[i]->getDisplacedProblem()->mesh().getMesh());
+      _from_meshes.push_back(& _from_problems[i]->getDisplacedProblem()->mesh());
     else
-      _from_meshes.push_back(& _from_es[i]->get_mesh());
+      _from_meshes.push_back(& _from_problems[i]->mesh());
   }
 }
 
@@ -145,8 +148,8 @@ MultiAppTransfer::getBboxes()
     MeshTools::BoundingBox bbox = MeshTools::processor_bounding_box(* _from_meshes[i], processor_id());
 
     // Translate the bounding box to the subapp's position.
-    bbox.first += _positions[i];
-    bbox.second += _positions[i];
+    bbox.first += _to_positions[i];
+    bbox.second += _to_positions[i];
 
     // Cast the bounding box into a pair of points (so it can be put through
     // MPI communication).

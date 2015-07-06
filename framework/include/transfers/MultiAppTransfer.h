@@ -74,9 +74,10 @@ protected:
   std::vector<FEProblem *> _from_problems;
   std::vector<EquationSystems *> _to_es;
   std::vector<EquationSystems *> _from_es;
-  std::vector<MeshBase *> _to_meshes;
-  std::vector<MeshBase *> _from_meshes;
-  std::vector<Point> _positions;    // Offset for subapps
+  std::vector<MooseMesh *> _to_meshes;
+  std::vector<MooseMesh *> _from_meshes;
+  std::vector<Point> _to_positions;
+  std::vector<Point> _from_positions;
 
   bool _displaced_source_mesh;
   bool _displaced_target_mesh;
