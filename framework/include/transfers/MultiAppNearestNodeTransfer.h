@@ -71,6 +71,8 @@ protected:
    */
   Real bboxMinDistance(Point p, MeshTools::BoundingBox bbox);
 
+  std::vector<Node *> getLocalNodes(MooseMesh * mesh);
+
   AuxVariableName _to_var_name;
   VariableName _from_var_name;
 

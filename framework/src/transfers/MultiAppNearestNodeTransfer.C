@@ -210,40 +210,53 @@ MultiAppNearestNodeTransfer::transferToMultiApp()
     _communicator.send(i_proc, outgoing_qps[i_proc]);
   }
 
-  for (processor_id_type i_proc = 0; i_proc < n_processors(); i_proc++)
   {
-    std::vector<Point> incoming_qps;
-    if (i_proc == processor_id())
-      incoming_qps = outgoing_qps[i_proc];
-    else
-      _communicator.receive(i_proc, incoming_qps);
-
-    //std::vector<Real> outgoing_evals(incoming_qps.size(), OutOfMeshValue);
-    //std::vector<unsigned int> outgoing_ids(incoming_qps.size(), -1); // -1 = largest unsigned int
-    std::vector<Point> outgoing_evals(incoming_qps.size());
-    //std::vector<std::pair<Real, Real> > outgoing_evals(incoming_qps.size());
-    for (unsigned int qp = 0; qp < incoming_qps.size(); qp++)
+    std::vector<Node *> local_nodes = getLocalNodes(from_mesh);
+    for (processor_id_type i_proc = 0; i_proc < n_processors(); i_proc++)
     {
-      Point qpt = incoming_qps[qp];
-      Real dist = std::numeric_limits<Real>::max();
-      Node * nearest_node = getNearestNode(qpt, dist, from_mesh, true);
+      std::vector<Point> incoming_qps;
+      if (i_proc == processor_id())
+        incoming_qps = outgoing_qps[i_proc];
+      else
+        _communicator.receive(i_proc, incoming_qps);
 
-      // Assuming LAGRANGE!
-      dof_id_type from_dof = nearest_node->dof_number(from_sys_num, from_var_num, 0);
+      //std::vector<Real> outgoing_evals(incoming_qps.size(), OutOfMeshValue);
+      //std::vector<unsigned int> outgoing_ids(incoming_qps.size(), -1); // -1 = largest unsigned int
+      std::vector<Point> outgoing_evals(incoming_qps.size());
+      //std::vector<std::pair<Real, Real> > outgoing_evals(incoming_qps.size());
+      for (unsigned int qp = 0; qp < incoming_qps.size(); qp++)
+      {
+        Point qpt = incoming_qps[qp];
+        Real dist = std::numeric_limits<Real>::max();
+        Node * nearest_node = NULL;
+        //Node * nearest_node = getNearestNode(qpt, dist, from_mesh, true);
+        for (unsigned int i_node = 0; i_node < local_nodes.size(); i_node++)
+        {
+          Real current_distance = (qpt - *(local_nodes[i_node])).size();
+          if (current_distance < dist)
+          {
+            dist = current_distance;
+            nearest_node = local_nodes[i_node];
+          }
+        }
 
-      //outgoing_evals[qp].first = (*serialized_solution)(from_dof);
-      //outgoing_evals[qp].second = dist;
-      outgoing_evals[qp](0) = (*serialized_solution)(from_dof);
-      outgoing_evals[qp](1) = dist;
-    }
+        // Assuming LAGRANGE!
+        dof_id_type from_dof = nearest_node->dof_number(from_sys_num, from_var_num, 0);
 
-    if (i_proc == processor_id())
-    {
-      incoming_evals[i_proc] = outgoing_evals;
-    }
-    else
-    {
-      _communicator.send(i_proc, outgoing_evals);
+        //outgoing_evals[qp].first = (*serialized_solution)(from_dof);
+        //outgoing_evals[qp].second = dist;
+        outgoing_evals[qp](0) = (*serialized_solution)(from_dof);
+        outgoing_evals[qp](1) = dist;
+      }
+
+      if (i_proc == processor_id())
+      {
+        incoming_evals[i_proc] = outgoing_evals;
+      }
+      else
+      {
+        _communicator.send(i_proc, outgoing_evals);
+      }
     }
   }
 
@@ -341,6 +354,8 @@ MultiAppNearestNodeTransfer::transferToMultiApp()
         solution.set(dof, best_val);
       }
     }
+    solution.close();
+    to_sys->update();
   }
 
   delete serialized_solution;
@@ -745,4 +760,38 @@ MultiAppNearestNodeTransfer::bboxMinDistance(Point p, MeshTools::BoundingBox bbo
       min_distance = distance;
   }
   return min_distance;
+}
+
+std::vector<Node *>
+MultiAppNearestNodeTransfer::getLocalNodes(MooseMesh * mesh)
+{
+  std::vector<Node *> nodes_out;
+
+  if (isParamValid("source_boundary"))
+  {
+    BoundaryID src_bnd_id = mesh->getBoundaryID(getParam<BoundaryName>("source_boundary"));
+
+    ConstBndNodeRange & bnd_nodes = *mesh->getBoundaryNodeRange();
+    for (ConstBndNodeRange::const_iterator nd = bnd_nodes.begin() ; nd != bnd_nodes.end(); ++nd)
+    {
+      const BndNode * bnode = *nd;
+      if (bnode->_bnd_id == src_bnd_id && bnode->_node->processor_id() == processor_id())
+        nodes_out.push_back(bnode->_node);
+    }
+  }
+  else
+  {
+    nodes_out.resize(mesh->getMesh().n_local_nodes());
+
+    MeshBase::const_node_iterator nodes_begin = mesh->localNodesBegin();
+    MeshBase::const_node_iterator nodes_end   = mesh->localNodesEnd();
+    
+    unsigned int i = 0;
+    for (MeshBase::const_node_iterator node_it = nodes_begin; node_it != nodes_end; ++node_it, ++i)
+    {
+      nodes_out[i] = *node_it;
+    }
+  }
+
+  return nodes_out;
 }
