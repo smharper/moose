@@ -1541,11 +1541,6 @@ public:
                                             THREAD_ID tid = 0,
                                             bool no_warn = false);
 
-  std::shared_ptr<MaterialBase> getInterfaceMaterial(std::string name,
-                                                     Moose::MaterialDataType type,
-                                                     THREAD_ID tid = 0,
-                                                     bool no_warn = false);
-
   /*
    * Return a pointer to the MaterialData
    */
