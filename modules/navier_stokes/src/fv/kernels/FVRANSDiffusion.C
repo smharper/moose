@@ -17,13 +17,16 @@ FVRANSDiffusion::validParams()
   InputParameters params = FVFluxKernel::validParams();
   params.addParam<std::vector<BoundaryName>>("walls",
     "Boundaries that correspond to solid walls");
+  params.addParam<MaterialPropertyName>("rho", "fluid density");
   params.set<unsigned short>("ghost_layers") = 2;
   return params;
 }
 
 FVRANSDiffusion::FVRANSDiffusion(const InputParameters & params)
   : FVFluxKernel(params),
-    _wall_boundary_names(getParam<std::vector<BoundaryName>>("walls"))
+    _wall_boundary_names(getParam<std::vector<BoundaryName>>("walls")),
+    _rho_elem(getADMaterialProperty<Real>("rho")),
+    _rho_neighbor(getNeighborADMaterialProperty<Real>("rho"))
 {
 }
 
@@ -63,7 +66,12 @@ FVRANSDiffusion::computeQpResidual()
   Real grad_u_norm = grad_u.norm().value();
   ADReal eddy_visc = grad_u_norm * mixing_len * mixing_len;
 
+  // Interpolate the density.
+  ADReal rho;
+  interpolate(Moose::FV::InterpMethod::Average, rho, _rho_elem[_qp],
+              _rho_neighbor[_qp], *_face_info);
+
   // Return the turbulent viscosity contribution to the momentum equation.
   auto dudn = gradUDotNormal();
-  return -1 * eddy_visc * dudn;
+  return -1 * rho * eddy_visc * dudn;
 }
