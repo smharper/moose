@@ -22,4 +22,7 @@ protected:
   ADReal computeQpResidual() override;
 
   std::vector<BoundaryName> _wall_boundary_names;
+
+  const ADMaterialProperty<Real> & _rho_elem;
+  const ADMaterialProperty<Real> & _rho_neighbor;
 };
