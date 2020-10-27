@@ -327,17 +327,10 @@ public:
   virtual const Elem * queryElemPtr(const dof_id_type i) const;
 
   /**
-   * Setter/getter for the _is_prepared flag.
+   * Setter/getter for whether the mesh is prepared
    */
   bool prepared() const;
   virtual void prepared(bool state);
-
-  /**
-   * If this method is called, we will call libMesh's prepare_for_use method when we
-   * call Moose's prepare method. This should only be set when the mesh structure is changed
-   * by MeshGenerators (i.e. Element deletion).
-   */
-  void needsPrepareForUse();
 
   /**
    * Declares that the MooseMesh has changed, invalidates cached data
@@ -460,10 +453,11 @@ public:
   const RealVectorValue & getNormalByBoundaryID(BoundaryID id) const;
 
   /**
-   * Calls prepare_for_use() if force=true on the underlying Mesh object, then communicates various
-   * boundary information on parallel meshes. Also calls update() internally.
+   * Calls prepare_for_use() if the underlying MeshBase object isn't prepared, then communicates
+   * various boundary information on parallel meshes. Also calls update() internally. We maintain
+   * the boolean parameter in order to maintain backwards compatability but it doesn't do anything
    */
-  void prepare(bool force = false);
+  void prepare(bool = false);
 
   /**
    * Calls buildNodeListFromSideList(), buildNodeList(), and buildBndElemList().
@@ -1119,12 +1113,6 @@ protected:
 
   /// True if a Nemesis Mesh was read in
   bool _is_nemesis;
-
-  /// True if prepare has been called on the mesh
-  bool _is_prepared;
-
-  /// True if prepare_for_use should be called when Mesh is prepared
-  bool _needs_prepare_for_use;
 
   /// The elements that were just refined.
   std::unique_ptr<ConstElemPointerRange> _refined_elements;
