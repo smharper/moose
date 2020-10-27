@@ -25,4 +25,9 @@ protected:
 
   const ADMaterialProperty<Real> & _rho_elem;
   const ADMaterialProperty<Real> & _rho_neighbor;
+
+  // A cache of wall distances indexed per face (actually indexed per pair of
+  // element pointers bounding that face).
+  std::unordered_map<const Elem *, std::unordered_map<const Elem *, Real>>
+    _dist_map;
 };

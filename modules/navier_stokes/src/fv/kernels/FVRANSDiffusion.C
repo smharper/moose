@@ -37,27 +37,48 @@ FVRANSDiffusion::computeQpResidual()
   // we need to update the framework so that _q_point is set when the material's
   // computeQpProperties()
 
-  // Get references to the Moose and libMesh mesh objects
-  const MooseMesh & m_mesh {subProblem().mesh()};
-  const MeshBase & l_mesh {m_mesh.getMesh()};
+  // See if we have already computed the distance from this face to the wall.
+  Real dist = -1;
+  const Elem * elem {&_face_info->elem()};
+  const Elem * neighbor {_face_info->neighborPtr()};
+  auto search1 = _dist_map.find(elem);
+  if (search1 != _dist_map.end()) {
+    const auto & inner_map = search1->second;
+    auto search2 = inner_map.find(neighbor);
+    if (search2 != inner_map.end()) {
+      dist = search2->second;
+    }
+  }
 
-  // Get the ids of the wall boundaries.
-  std::vector<BoundaryID> vec_ids =
-    m_mesh.getBoundaryIDs(_wall_boundary_names, true);
+  // Compute the wall distance and cache it if necessary.
+  if (dist == -1) {
+    // Get references to the Moose and libMesh mesh objects
+    const MooseMesh & m_mesh {subProblem().mesh()};
+    const MeshBase & l_mesh {m_mesh.getMesh()};
 
-  // Loop over all boundary elements and find the distance to the closest one.
-  auto bnd_to_elem_map = m_mesh.getBoundariesToElems();
-  auto bnd_elems = bnd_to_elem_map[vec_ids[0]];
-  Real min_sq_dist = 1e9;
-  for (dof_id_type elem_id : bnd_elems) {
-    const Elem & elem {l_mesh.elem_ref(elem_id)};
-    Point bnd_pos = elem.centroid();
-    Real sq_dist = (bnd_pos - _face_info->faceCentroid()).norm_sq();
-    min_sq_dist = std::min(min_sq_dist, sq_dist);
+    // Get the ids of the wall boundaries.
+    std::vector<BoundaryID> vec_ids =
+      m_mesh.getBoundaryIDs(_wall_boundary_names, true);
+
+    // Loop over all boundary elements and find the distance to the closest one.
+    auto bnd_to_elem_map = m_mesh.getBoundariesToElems();
+    auto bnd_elems = bnd_to_elem_map[vec_ids[0]];
+    Real min_sq_dist = 1e9;
+    for (dof_id_type elem_id : bnd_elems) {
+      const Elem & elem {l_mesh.elem_ref(elem_id)};
+      Point bnd_pos = elem.centroid();
+      Real sq_dist = (bnd_pos - _face_info->faceCentroid()).norm_sq();
+      min_sq_dist = std::min(min_sq_dist, sq_dist);
+    }
+    Real dist = std::sqrt(min_sq_dist);
+
+    // Cache the distance.
+    auto & inner_map = _dist_map[elem];
+    inner_map[neighbor] = dist;
   }
 
   // Approximate the eddy mixing length as the distance to the nearest wall.
-  Real mixing_len = std::sqrt(min_sq_dist);
+  Real mixing_len = dist;
 
   // Compute the eddy viscosity.
   // TODO: Why are there nan's in the grad_u.norm() derivative terms?  In the
