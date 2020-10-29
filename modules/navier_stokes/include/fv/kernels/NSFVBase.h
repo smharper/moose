@@ -97,9 +97,9 @@ protected:
   const MooseVariableFV<Real> * const _w_var;
 
   /// The viscosity
-  const Real _mu;
+  Real _mu;
   /// The density
-  const Real _rho;
+  Real _rho;
 
   /// The interpolation method to use for the velocity
   Moose::FV::InterpMethod _velocity_interp_method;

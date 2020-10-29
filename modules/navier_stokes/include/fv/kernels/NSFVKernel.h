@@ -33,6 +33,8 @@ protected:
 
   void residualSetup() override { clearRCCoeffs(); }
   void jacobianSetup() override { clearRCCoeffs(); }
+  const ADMaterialProperty<Real> & _mu_prop;
+  const ADMaterialProperty<Real> & _rho_prop;
 };
 
 #endif

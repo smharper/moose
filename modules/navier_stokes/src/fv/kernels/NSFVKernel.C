@@ -29,10 +29,17 @@ NSFVKernel::validParams()
 {
   InputParameters params = FVMatAdvection::validParams();
   params += NSFVBase::validParams();
+  params.addParam<MaterialPropertyName>("mu_property", 1, "The viscosity");
+  params.addParam<MaterialPropertyName>("rho_property", 1, "The density");
   return params;
 }
 
-NSFVKernel::NSFVKernel(const InputParameters & params) : FVMatAdvection(params), NSFVBase(params) {}
+NSFVKernel::NSFVKernel(const InputParameters & params)
+  : FVMatAdvection(params),
+    NSFVBase(params),
+    _mu_prop(getADMaterialProperty<Real>("mu_property")),
+    _rho_prop(getADMaterialProperty<Real>("rho_property"))
+{}
 
 void
 NSFVKernel::interpolate(Moose::FV::InterpMethod m,
@@ -105,6 +112,9 @@ NSFVKernel::interpolate(Moose::FV::InterpMethod m,
 ADReal
 NSFVKernel::computeQpResidual()
 {
+  _mu = _mu_prop[_qp].value();
+  _rho = _rho_prop[_qp].value();
+
   ADRealVectorValue v;
   ADReal u_interface;
 
