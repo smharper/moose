@@ -9,15 +9,24 @@
 
 #pragma once
 
-#include "FVElementalKernel.h"
+#include "FVFluxKernel.h"
 
-class FVReaction : public FVElementalKernel
+class FVScalarRANSDiffusion : public FVFluxKernel
 {
 public:
   static InputParameters validParams();
-  FVReaction(const InputParameters & parameters);
+
+  FVScalarRANSDiffusion(const InputParameters & params);
 
 protected:
   ADReal computeQpResidual() override;
-  Real _rate;
+
+  std::vector<BoundaryName> _wall_boundary_names;
+
+  // A cache of wall distances indexed per face (actually indexed per pair of
+  // element pointers bounding that face).
+  std::unordered_map<const Elem *, std::unordered_map<const Elem *, Real>>
+    _dist_map;
+
+  const ADVariableValue & _visc;
 };
