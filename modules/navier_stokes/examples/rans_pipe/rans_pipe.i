@@ -84,8 +84,8 @@ force_boundary_execution=true
     type = INSFVRANSDiffusion
     variable = u
     force_boundary_execution = ${force_boundary_execution}
-    walls = 'right'
     rho = ${rho}
+    mixing_length = mixing_len
   []
   [u_pressure]
     type = INSFVMomentumPressure
@@ -125,8 +125,8 @@ force_boundary_execution=true
     type = INSFVRANSDiffusion
     variable = v
     force_boundary_execution = ${force_boundary_execution}
-    walls = 'right'
     rho = ${rho}
+    mixing_length = mixing_len
   []
   [v_pressure]
     type = INSFVMomentumPressure
@@ -286,4 +286,21 @@ force_boundary_execution=true
 
 [Debug]
   show_var_residual_norms = true
+[]
+
+[AuxVariables]
+  [mixing_len]
+    order = CONSTANT
+    family = MONOMIAL
+    fv = true
+  []
+[]
+
+[AuxKernels]
+  [mixing_len]
+    type = WallDistanceMixingLengthAux
+    walls = 'right'
+    variable = mixing_len
+    execute_on = 'initial'
+  []
 []

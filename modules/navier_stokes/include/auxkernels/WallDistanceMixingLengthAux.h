@@ -9,19 +9,24 @@
 
 #pragma once
 
-#include "FVFluxKernel.h"
+#include "AuxKernel.h"
 
-class INSFVRANSDiffusion : public FVFluxKernel
+class WallDistanceMixingLengthAux;
+
+template <>
+InputParameters validParams<WallDistanceMixingLengthAux>();
+
+class WallDistanceMixingLengthAux : public AuxKernel
 {
 public:
   static InputParameters validParams();
 
-  INSFVRANSDiffusion(const InputParameters & params);
+  WallDistanceMixingLengthAux(const InputParameters & parameters);
 
 protected:
-  ADReal computeQpResidual() override;
+  virtual Real computeValue();
 
-  const VariableValue & _mixing_len;
+  std::vector<BoundaryName> _wall_boundary_names;
 
-  const Real & _rho;
+  const Real & _von_karman_const;
 };
