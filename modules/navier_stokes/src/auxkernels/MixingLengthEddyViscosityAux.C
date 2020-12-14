@@ -28,8 +28,10 @@ MixingLengthEddyViscosityAux::MixingLengthEddyViscosityAux(const InputParameters
   : AuxKernel(params),
     _mixing_len(coupledValue("mixing_length"))
 {
+  THREAD_ID tid = params.get<THREAD_ID>("_tid");
   VariableName u_var_name = params.get<std::vector<VariableName>>("u").front();
-  const MooseVariableFieldBase * u_var_moose = getFieldVar(u_var_name, 0);
+  const MooseVariableFieldBase * u_var_moose
+    = &_subproblem.getVariable(tid, u_var_name);
   _u_var = dynamic_cast<const MooseVariableFV<Real> *>(u_var_moose);
   if (!_u_var)
     mooseError("the u velocity must be a finite volume variable.");
@@ -38,7 +40,7 @@ MixingLengthEddyViscosityAux::MixingLengthEddyViscosityAux(const InputParameters
   if (params.isParamValid("v")) {
     VariableName v_var_name
       = params.get<std::vector<VariableName>>("v").front();
-    v_var_moose = getFieldVar(v_var_name, 0);
+    v_var_moose = &_subproblem.getVariable(tid, v_var_name);
   }
   _v_var = dynamic_cast<const MooseVariableFV<Real> *>(v_var_moose);
   if (_subproblem.mesh().dimension() >= 2 && !_v_var)
@@ -49,7 +51,7 @@ MixingLengthEddyViscosityAux::MixingLengthEddyViscosityAux(const InputParameters
   if (params.isParamValid("w")) {
     VariableName w_var_name
       = params.get<std::vector<VariableName>>("w").front();
-    w_var_moose = getFieldVar(w_var_name, 0);
+    w_var_moose = &_subproblem.getVariable(tid, w_var_name);
   }
   _w_var = dynamic_cast<const MooseVariableFV<Real> *>(w_var_moose);
   if (_subproblem.mesh().dimension() >= 3 && !_w_var)
